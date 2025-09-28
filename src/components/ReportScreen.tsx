@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { analyzeHazardDirect } from '../gemini';
 import {
   View,
   Text,
@@ -32,6 +33,8 @@ interface PhotoItem {
   id: string;
   uri: string;
   type: 'camera' | 'gallery';
+  base64?: string;          // 👈 add
+  mimeType?: string;
 }
 
 export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
@@ -76,13 +79,17 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
+      base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
+      const a = result.assets[0];
       const newPhoto: PhotoItem = {
         id: Date.now().toString(),
-        uri: result.assets[0].uri,
+        uri: a.uri,
         type: 'camera',
+        base64: a.base64,                 // 👈 keep it
+        mimeType: a.mimeType || 'image/jpeg',
       };
       setPhotos(prev => [...prev, newPhoto]);
     }
@@ -100,13 +107,17 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.8,
+      base64: true,
     });
 
     if (!result.canceled && result.assets) {
-      const newPhotos: PhotoItem[] = result.assets.map((asset, index) => ({
-        id: `${Date.now()}-${index}`,
-        uri: asset.uri,
+      const now = Date.now();
+      const newPhotos: PhotoItem[] = result.assets.map((a, index) => ({
+        id: `${now}-${index}`,
+        uri: a.uri,
         type: 'gallery',
+        base64: a.base64,                 // 👈 keep it
+        mimeType: a.mimeType || 'image/jpeg',
       }));
       setPhotos(prev => [...prev, ...newPhotos]);
     }
@@ -137,30 +148,56 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
-    
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const reportData: ReportData = {
-        title: title.trim() || `Hazard Report - ${new Date().toLocaleDateString()}`,
+      const primary = photos[0];
+      if (!primary) {
+        Alert.alert('Error', 'Please attach at least one photo.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Prefer data URL if base64 is present; fallback to URI (gemini.js can still read URI)
+      const imageForGemini = primary.base64
+        ? `data:${primary.mimeType || 'image/jpeg'};base64,${primary.base64}`
+        : primary.uri;
+
+      // Ask Gemini (frontend direct)
+      const ai = await analyzeHazardDirect({
+        title: title.trim() || null,
         description: description.trim(),
-        images: photos.map(photo => photo.uri),
+        image: imageForGemini,                         // 👈 pass data URL when available
+        imageMime: primary.mimeType || 'image/jpeg',
+      });
+
+      // Prefer user-provided title; otherwise AI’s title
+      const finalTitle =
+        (title && title.trim()) ||
+        (ai?.title && String(ai.title).trim()) ||
+        'Hazard Report';
+
+      // Prefer AI-improved description if present
+      const finalDescription =
+        (ai?.improved_description && String(ai.improved_description).trim()) ||
+        description.trim();
+
+      const reportData: ReportData = {
+        title: finalTitle,
+        description: finalDescription,
+        images: photos.map(p => p.uri),
       };
 
       onSubmit(reportData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting report:', error);
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      Alert.alert('Error', error?.message ? String(error.message) : 'Failed to submit report. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <View style={styles.container}>
