@@ -28,6 +28,7 @@ interface ReportData {
   title: string;
   description: string;
   images: string[];
+  category?: string;
 }
 
 interface PhotoItem {
@@ -172,6 +173,23 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         imageMime: primary.mimeType || 'image/jpeg',
       });
 
+      if (!ai?.valid_hazard) {
+        const reasons =
+          Array.isArray(ai?.reasons) && ai.reasons.length
+            ? `\n\nWhy:\n• ${ai.reasons.join('\n• ')}`
+            : '';
+
+        Alert.alert(
+          'Not a Public Hazard',
+          `This submission doesn't look like a public hazard.${reasons}`
+        );
+
+        setIsSubmitting(false);
+        return;
+      }
+
+      const finalCategory = (typeof ai?.category === 'string' && ai.category) || 'other';
+
       // Prefer user-provided title; otherwise AI’s title
       const finalTitle =
         (title && title.trim()) ||
@@ -187,6 +205,7 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         title: finalTitle,
         description: finalDescription,
         images: photos.map(p => p.uri),
+        category: finalCategory,
       };
 
       console.log('ReportScreen: Calling onSubmit with reportData:', reportData);
