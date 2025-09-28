@@ -132,9 +132,7 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
-    // if (!title.trim()) {
-    //   newErrors.title = 'Title is required';
-    // }
+    // Title is now optional - no validation needed
     
     if (!description.trim()) {
       newErrors.description = 'Description is required';
@@ -225,20 +223,14 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Title Section */}
         <View style={styles.section}>
-          <Text style={styles.label}>Title</Text>
+          <Text style={styles.label}>Title (Optional)</Text>
           <TextInput
-            style={[styles.titleInput, errors.title && styles.inputError]}
+            style={styles.titleInput}
             value={title}
-            onChangeText={(text) => {
-              setTitle(text);
-              if (errors.title) {
-                setErrors(prev => ({ ...prev, title: '' }));
-              }
-            }}
+            onChangeText={setTitle}
             placeholder="Enter title for your report"
             placeholderTextColor="#999999"
           />
-          {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
           {description.trim() && (
             <TouchableOpacity
               style={styles.aiButton}
@@ -259,7 +251,7 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
 
         {/* Description Section */}
         <View style={styles.section}>
-          <Text style={styles.label}>Describe the Image</Text>
+          <Text style={styles.label}>Describe the Image<Text style={styles.requiredAsterisk}> *</Text></Text>
           <TextInput
             style={[styles.descriptionInput, errors.description && styles.inputError]}
             value={description}
@@ -280,7 +272,7 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
 
         {/* Photo Section */}
         <View style={styles.section}>
-          <Text style={styles.label}>Attached Images</Text>
+          <Text style={styles.label}>Attached Images<Text style={styles.requiredAsterisk}> *</Text></Text>
           
           {/* Photo Action Buttons */}
           <View style={styles.photoActions}>
@@ -397,6 +389,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 12,
+  },
+  requiredAsterisk: {
+    color: '#E74C3C',
+    fontWeight: 'bold',
   },
   titleInput: {
     backgroundColor: '#F5F5F5',
