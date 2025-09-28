@@ -11,24 +11,23 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-interface SuccessPopupProps {
+interface ErrorPopupProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
   message?: string;
+  type?: 'error' | 'warning' | 'info';
 }
 
-export default function SuccessPopup({ 
+export default function ErrorPopup({ 
   visible, 
   onClose, 
-  title = "Post Submitted!",
-  message = "Thank you for your contribution to making our community safer."
-}: SuccessPopupProps) {
+  title = "Error",
+  message = "Something went wrong. Please try again.",
+  type = 'error'
+}: ErrorPopupProps) {
   const slideAnim = useRef(new Animated.Value(-200)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  console.log('SuccessPopup rendered, visible:', visible);
-  console.log('SuccessPopup props:', { visible, title, message });
 
   useEffect(() => {
     if (visible) {
@@ -66,6 +65,19 @@ export default function SuccessPopup({
     onClose();
   };
 
+  const getIconAndColor = () => {
+    switch (type) {
+      case 'warning':
+        return { icon: 'warning', color: '#F39C12' };
+      case 'info':
+        return { icon: 'information-circle', color: '#3498DB' };
+      default:
+        return { icon: 'close-circle', color: '#E74C3C' };
+    }
+  };
+
+  const { icon, color } = getIconAndColor();
+
   if (!visible) return null;
 
   return (
@@ -86,15 +98,15 @@ export default function SuccessPopup({
         ]}
       >
         <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-circle" size={48} color="#27AE60" />
+          <Ionicons name={icon} size={48} color={color} />
         </View>
         
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
         
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+        <TouchableOpacity style={[styles.closeButton, { backgroundColor: color }]} onPress={handleClose}>
           <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-          <Text style={styles.closeButtonText}>Continue</Text>
+          <Text style={styles.closeButtonText}>OK</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -145,7 +157,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   closeButton: {
-    backgroundColor: '#E74C3C',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

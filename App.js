@@ -2,15 +2,17 @@ import React, { useState, useEffect } from "react";
 import LoadingScreen from "./src/components/LoadingScreen";
 import MapScreen from "./src/components/MapScreen";
 import ReportScreen from "./src/components/ReportScreen";
+import ConfirmationScreen from "./src/components/ConfirmationScreen";
 import SuccessPopup from "./src/components/SuccessPopup";
 import * as Location from 'expo-location';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const [currentScreen, setCurrentScreen] = useState('map'); // 'map' or 'report'
+  const [currentScreen, setCurrentScreen] = useState('map'); // 'map', 'report', or 'confirmation'
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [hazards, setHazards] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
+  const [submittedReport, setSubmittedReport] = useState(null);
 
   const handleLoadingComplete = async () => {
     // Get user location when app loads
@@ -42,8 +44,8 @@ export default function App() {
     console.log('Report submitted:', reportData);
     console.log('User location:', userLocation);
     
-    // Add new hazard to the map with actual user location
-    const newHazard = {
+    // Create the submitted report with actual user location
+    const newReport = {
       id: Date.now().toString(),
       title: reportData.title,
       description: reportData.description,
@@ -53,15 +55,14 @@ export default function App() {
       timestamp: new Date().toISOString(),
     };
     
-    console.log('New hazard created:', newHazard);
-    setHazards(prev => [...prev, newHazard]);
-    setCurrentScreen('map');
+    console.log('New report created:', newReport);
     
-    // Show popup immediately
-    setTimeout(() => {
-      console.log('Showing success popup now');
-      setShowSuccessPopup(true);
-    }, 100);
+    // Add to hazards list for map display
+    setHazards(prev => [...prev, newReport]);
+    
+    // Set the submitted report and navigate to confirmation
+    setSubmittedReport(newReport);
+    setCurrentScreen('confirmation');
   };
 
   const handleCloseSuccessPopup = () => {
@@ -86,16 +87,19 @@ export default function App() {
   // Show appropriate screen based on current state
   if (currentScreen === 'report') {
     return (
-      <>
-        <ReportScreen 
-          onBack={handleBackToMap} 
-          onSubmit={handleReportSubmit} 
-        />
-        <SuccessPopup 
-          visible={showSuccessPopup}
-          onClose={handleCloseSuccessPopup}
-        />
-      </>
+      <ReportScreen 
+        onBack={handleBackToMap} 
+        onSubmit={handleReportSubmit} 
+      />
+    );
+  }
+
+  if (currentScreen === 'confirmation' && submittedReport) {
+    return (
+      <ConfirmationScreen 
+        onBack={handleBackToMap} 
+        reportData={submittedReport} 
+      />
     );
   }
 
