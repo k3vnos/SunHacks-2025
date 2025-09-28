@@ -59,9 +59,11 @@ export default function App() {
 
   const handleBackToMap = () => {
     setCurrentScreen('map');
+    // Clear the submitted report when going back to map
+    setSubmittedReport(null);
   };
 
-  const handleReportSubmit = async (reportData) => {
+  const handleReportSubmit = async (reportData, onNavigationComplete) => {
     console.log('Report submitted:', reportData);
     console.log('Current user location:', userLocation);
     
@@ -95,8 +97,18 @@ export default function App() {
       setHazards(prev => [...prev, newReport]);
       
       // Set the submitted report and navigate to confirmation
+      console.log('Setting submitted report and navigating to confirmation');
+      
+      // Use a single state update to avoid race conditions
       setSubmittedReport(newReport);
-      setCurrentScreen('confirmation');
+      setTimeout(() => {
+        setCurrentScreen('confirmation');
+        console.log('Navigation to confirmation screen completed');
+        // Call the callback to stop loading animation
+        if (onNavigationComplete) {
+          onNavigationComplete();
+        }
+      }, 0);
     } catch (error) {
       console.error('Error getting fresh location:', error);
       // Fallback to stored location if fresh location fails
@@ -111,14 +123,30 @@ export default function App() {
       };
       
       setHazards(prev => [...prev, newReport]);
+      console.log('Setting submitted report (fallback) and navigating to confirmation');
+      
+      // Use a single state update to avoid race conditions
       setSubmittedReport(newReport);
-      setCurrentScreen('confirmation');
+      setTimeout(() => {
+        setCurrentScreen('confirmation');
+        console.log('Navigation to confirmation screen completed (fallback)');
+        // Call the callback to stop loading animation
+        if (onNavigationComplete) {
+          onNavigationComplete();
+        }
+      }, 0);
     }
   };
 
   const handleCloseSuccessPopup = () => {
     console.log('Closing success popup');
     setShowSuccessPopup(false);
+  };
+
+  const handleConfirmationComplete = () => {
+    console.log('Confirmation completed, returning to map');
+    setCurrentScreen('map');
+    setSubmittedReport(null);
   };
 
   // Test function to show popup
@@ -136,8 +164,13 @@ export default function App() {
     };
   }, [locationSubscription]);
 
+  // Debug state changes
+  useEffect(() => {
+    console.log('State changed - currentScreen:', currentScreen, 'submittedReport:', submittedReport ? 'exists' : 'null');
+  }, [currentScreen, submittedReport]);
+
   // Debug logging
-  console.log('App state - showSuccessPopup:', showSuccessPopup, 'hazards count:', hazards.length, 'user location:', userLocation);
+  console.log('App state - currentScreen:', currentScreen, 'showSuccessPopup:', showSuccessPopup, 'hazards count:', hazards.length, 'user location:', userLocation, 'submittedReport:', submittedReport ? 'exists' : 'null');
 
   // Show loading screen first
   if (isLoading) {
@@ -145,7 +178,10 @@ export default function App() {
   }
 
   // Show appropriate screen based on current state
+  console.log('Rendering decision - currentScreen:', currentScreen, 'submittedReport:', submittedReport ? 'exists' : 'null');
+  
   if (currentScreen === 'report') {
+    console.log('Rendering ReportScreen');
     return (
       <ReportScreen 
         onBack={handleBackToMap} 
@@ -155,14 +191,17 @@ export default function App() {
   }
 
   if (currentScreen === 'confirmation' && submittedReport) {
+    console.log('Rendering ConfirmationScreen');
     return (
       <ConfirmationScreen 
         onBack={handleBackToMap} 
+        onComplete={handleConfirmationComplete}
         reportData={submittedReport} 
       />
     );
   }
 
+  console.log('Rendering MapScreen (default)');
   return (
     <>
       <MapScreen onFlagPress={handleFlagPress} hazards={hazards} />
