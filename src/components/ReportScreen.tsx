@@ -39,6 +39,8 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   // Generate AI title based on description
   const generateTitle = async (description: string) => {
@@ -115,20 +117,51 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
     setPhotos(prev => prev.filter(photo => photo.id !== photoId));
   };
 
+  // Validate form
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    if (!title.trim()) {
+      newErrors.title = 'Title is required';
+    }
+    
+    if (!description.trim()) {
+      newErrors.description = 'Description is required';
+    }
+    
+    if (photos.length === 0) {
+      newErrors.photos = 'At least one photo is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // Handle form submission
-  const handleSubmit = () => {
-    if (!title.trim() || !description.trim()) {
-      Alert.alert('Missing Information', 'Please fill in both title and description.');
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    const reportData: ReportData = {
-      title: title.trim(),
-      description: description.trim(),
-      images: photos.map(photo => photo.uri),
-    };
+    setIsSubmitting(true);
+    
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const reportData: ReportData = {
+        title: title.trim(),
+        description: description.trim(),
+        images: photos.map(photo => photo.uri),
+      };
 
-    onSubmit(reportData);
+      onSubmit(reportData);
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      Alert.alert('Error', 'Failed to submit report. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,12 +190,18 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         <View style={styles.section}>
           <Text style={styles.label}>Title</Text>
           <TextInput
-            style={styles.titleInput}
+            style={[styles.titleInput, errors.title && styles.inputError]}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(text) => {
+              setTitle(text);
+              if (errors.title) {
+                setErrors(prev => ({ ...prev, title: '' }));
+              }
+            }}
             placeholder="Enter title for your report"
             placeholderTextColor="#999999"
           />
+          {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
           {description.trim() && (
             <TouchableOpacity
               style={styles.aiButton}
@@ -185,15 +224,21 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         <View style={styles.section}>
           <Text style={styles.label}>Describe the Image</Text>
           <TextInput
-            style={styles.descriptionInput}
+            style={[styles.descriptionInput, errors.description && styles.inputError]}
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(text) => {
+              setDescription(text);
+              if (errors.description) {
+                setErrors(prev => ({ ...prev, description: '' }));
+              }
+            }}
             placeholder="Describe what you see in detail..."
             placeholderTextColor="#999999"
             multiline
             numberOfLines={4}
             textAlignVertical="top"
           />
+          {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
         </View>
 
         {/* Photo Section */}
@@ -213,6 +258,8 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
             </TouchableOpacity>
           </View>
 
+          {errors.photos && <Text style={styles.errorText}>{errors.photos}</Text>}
+
           {/* Photo Grid */}
           {photos.length > 0 && (
             <View style={styles.photoGrid}>
@@ -221,7 +268,12 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
                   <Image source={{ uri: photo.uri }} style={styles.photoImage} />
                   <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => deletePhoto(photo.id)}
+                    onPress={() => {
+                      deletePhoto(photo.id);
+                      if (errors.photos) {
+                        setErrors(prev => ({ ...prev, photos: '' }));
+                      }
+                    }}
                   >
                     <Ionicons name="close-circle" size={24} color="#E74C3C" />
                   </TouchableOpacity>
@@ -241,8 +293,19 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
 
       {/* Submit Button */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Post</Text>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <View style={styles.loadingContainer}>
+              <Ionicons name="hourglass" size={20} color="#FFFFFF" />
+              <Text style={styles.submitButtonText}>Submitting...</Text>
+            </View>
+          ) : (
+            <Text style={styles.submitButtonText}>Post</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -398,16 +461,31 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0E0E0',
   },
   submitButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#E74C3C',
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#BDC3C7',
   },
   submitButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputError: {
+    borderColor: '#E74C3C',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#E74C3C',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
   },
 });
