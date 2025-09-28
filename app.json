@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FlagIt",
-    "slug": "FlagIt",
+    "name": "Hazard Watch",
+    "slug": "hazard-watch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,17 +13,34 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs location access to show hazards near you and allow you to report new ones.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs location access to show hazards near you and allow you to report new ones.",
+        "NSCameraUsageDescription": "This app needs camera access to take photos of hazards you want to report."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-location",
+      "expo-camera",
+      "expo-notifications"
+    ]
   }
 }
