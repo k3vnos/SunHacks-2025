@@ -58,10 +58,8 @@ npx expo start -c --tunnel
 
 ## Demo
 
+https://github.com/user-attachments/assets/92e9486d-b31b-4ccd-83e3-1bea18baa11e
 
 
 
----
-
-## Video
 
