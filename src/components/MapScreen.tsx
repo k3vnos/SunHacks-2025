@@ -31,6 +31,7 @@ interface Hazard {
   upvotes?: number;
   downvotes?: number;
   comments?: Comment[];
+  category?: string;
 }
 
 interface Comment {
@@ -56,6 +57,52 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
   const [showHazardModal, setShowHazardModal] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [userVotes, setUserVotes] = useState<{[key: string]: 'up' | 'down' | null}>({});
+  const [liveVoteCounts, setLiveVoteCounts] = useState<{[key: string]: {upvotes: number, downvotes: number}}>({});
+  const [commentVoteCounts, setCommentVoteCounts] = useState<{[key: string]: {upvotes: number, downvotes: number}}>({});
+  const [hazardCategories, setHazardCategories] = useState<{[key: string]: string}>({});
+
+  // Initialize vote counts when hazards change
+  useEffect(() => {
+    const initialCounts: {[key: string]: {upvotes: number, downvotes: number}} = {};
+    const initialCommentCounts: {[key: string]: {upvotes: number, downvotes: number}} = {};
+    const initialCategories: {[key: string]: string} = {};
+    
+    hazards.forEach(hazard => {
+      if (!liveVoteCounts[hazard.id]) {
+        initialCounts[hazard.id] = {
+          upvotes: hazard.upvotes || 0,
+          downvotes: hazard.downvotes || 0,
+        };
+      }
+      
+      // Initialize hazard categories
+      if (!hazardCategories[hazard.id]) {
+        initialCategories[hazard.id] = hazard.category || 'Hazard';
+      }
+      
+      // Initialize comment vote counts
+      if (hazard.comments) {
+        hazard.comments.forEach(comment => {
+          if (!commentVoteCounts[comment.id]) {
+            initialCommentCounts[comment.id] = {
+              upvotes: comment.upvotes || 0,
+              downvotes: comment.downvotes || 0,
+            };
+          }
+        });
+      }
+    });
+    
+    if (Object.keys(initialCounts).length > 0) {
+      setLiveVoteCounts(prev => ({ ...prev, ...initialCounts }));
+    }
+    if (Object.keys(initialCommentCounts).length > 0) {
+      setCommentVoteCounts(prev => ({ ...prev, ...initialCommentCounts }));
+    }
+    if (Object.keys(initialCategories).length > 0) {
+      setHazardCategories(prev => ({ ...prev, ...initialCategories }));
+    }
+  }, [hazards]);
 
   // Simple location initialization - no watching
   useEffect(() => {
@@ -159,13 +206,35 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
 
   const handleVote = (hazardId: string, voteType: 'up' | 'down') => {
     const currentVote = userVotes[hazardId];
+    const currentCounts = liveVoteCounts[hazardId] || { upvotes: 0, downvotes: 0 };
     let newVote: 'up' | 'down' | null = null;
+    let newCounts = { ...currentCounts };
     
     // Toggle logic: if same vote, remove it; otherwise set new vote
     if (currentVote === voteType) {
       newVote = null; // Remove vote
+      // Decrease the count for the vote being removed
+      if (voteType === 'up') {
+        newCounts.upvotes = Math.max(0, newCounts.upvotes - 1);
+      } else {
+        newCounts.downvotes = Math.max(0, newCounts.downvotes - 1);
+      }
     } else {
       newVote = voteType; // Set new vote
+      
+      // Remove previous vote if exists
+      if (currentVote === 'up') {
+        newCounts.upvotes = Math.max(0, newCounts.upvotes - 1);
+      } else if (currentVote === 'down') {
+        newCounts.downvotes = Math.max(0, newCounts.downvotes - 1);
+      }
+      
+      // Add new vote
+      if (voteType === 'up') {
+        newCounts.upvotes += 1;
+      } else {
+        newCounts.downvotes += 1;
+      }
     }
     
     setUserVotes(prev => ({
@@ -173,8 +242,13 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
       [hazardId]: newVote
     }));
     
+    setLiveVoteCounts(prev => ({
+      ...prev,
+      [hazardId]: newCounts
+    }));
+    
     // TODO: Send vote to backend
-    console.log(`Voted ${voteType} for hazard ${hazardId}`);
+    console.log(`Voted ${voteType} for hazard ${hazardId}`, newCounts);
   };
 
   const handleAddComment = () => {
@@ -200,9 +274,25 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
   };
 
   const handleCommentVote = (commentId: string, voteType: 'up' | 'down') => {
+    const currentCounts = commentVoteCounts[commentId] || { upvotes: 0, downvotes: 0 };
+    let newCounts = { ...currentCounts };
+    
+    // Simple increment for comment votes (no toggle logic for comments)
+    if (voteType === 'up') {
+      newCounts.upvotes += 1;
+    } else {
+      newCounts.downvotes += 1;
+    }
+    
+    setCommentVoteCounts(prev => ({
+      ...prev,
+      [commentId]: newCounts
+    }));
+    
     // TODO: Send comment vote to backend
-    console.log(`Voted ${voteType} for comment ${commentId}`);
+    console.log(`Voted ${voteType} for comment ${commentId}`, newCounts);
   };
+
 
   return (
     <View style={styles.container}>
@@ -305,9 +395,17 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
                   </View>
                 )}
                 
-                <Text style={styles.timestamp}>
-                  Reported: {new Date(selectedHazard.timestamp).toLocaleDateString()}
-                </Text>
+                <View style={styles.timestampContainer}>
+                  <Text style={styles.timestamp}>
+                    Reported: {new Date(selectedHazard.timestamp).toLocaleDateString()}
+                  </Text>
+                  <View style={styles.categoryContainer}>
+                    <Text style={styles.categoryLabel}>Category:</Text>
+                    <Text style={styles.categoryText}>
+                      {hazardCategories[selectedHazard.id] || selectedHazard.category || 'Hazard'}
+                    </Text>
+                  </View>
+                </View>
 
                 {/* Voting Section */}
                 <View style={styles.votingSection}>
@@ -330,7 +428,7 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
                         styles.voteButtonText,
                         userVotes[selectedHazard.id] === 'up' && styles.voteButtonTextActive
                       ]}>
-                        Yes ({selectedHazard.upvotes || 0})
+                        Yes ({liveVoteCounts[selectedHazard.id]?.upvotes || selectedHazard.upvotes || 0})
                       </Text>
                     </Pressable>
                     
@@ -351,7 +449,7 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
                         styles.voteButtonText,
                         userVotes[selectedHazard.id] === 'down' && styles.voteButtonTextActive
                       ]}>
-                        No ({selectedHazard.downvotes || 0})
+                        No ({liveVoteCounts[selectedHazard.id]?.downvotes || selectedHazard.downvotes || 0})
                       </Text>
                     </Pressable>
                   </View>
@@ -397,14 +495,14 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
                             onPress={() => handleCommentVote(comment.id, 'up')}
                           >
                             <Ionicons name="thumbs-up" size={16} color="#27AE60" />
-                            <Text style={styles.commentVoteText}>{comment.upvotes || 0}</Text>
+                            <Text style={styles.commentVoteText}>{commentVoteCounts[comment.id]?.upvotes || comment.upvotes || 0}</Text>
                           </Pressable>
                           <Pressable 
                             style={styles.commentVoteButton}
                             onPress={() => handleCommentVote(comment.id, 'down')}
                           >
                             <Ionicons name="thumbs-down" size={16} color="#E74C3C" />
-                            <Text style={styles.commentVoteText}>{comment.downvotes || 0}</Text>
+                            <Text style={styles.commentVoteText}>{commentVoteCounts[comment.id]?.downvotes || comment.downvotes || 0}</Text>
                           </Pressable>
                         </View>
                       </View>
@@ -564,10 +662,29 @@ const styles = StyleSheet.create({
     marginRight: 8,
     resizeMode: 'cover',
   },
+  timestampContainer: {
+    marginTop: 12,
+  },
   timestamp: {
     fontSize: 12,
     color: '#95A5A6',
     fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryLabel: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    fontWeight: '500',
+  },
+  categoryText: {
+    fontSize: 12,
+    color: 'black',
+    fontWeight: '500',
   },
   // Voting Section Styles
   votingSection: {
