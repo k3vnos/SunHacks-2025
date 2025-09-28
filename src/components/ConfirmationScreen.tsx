@@ -16,6 +16,7 @@ const { width, height } = Dimensions.get('window');
 
 interface ConfirmationScreenProps {
   onBack: () => void;
+  onComplete: () => void;
   reportData: {
     id: string;
     title: string;
@@ -27,7 +28,7 @@ interface ConfirmationScreenProps {
   };
 }
 
-export default function ConfirmationScreen({ onBack, reportData }: ConfirmationScreenProps) {
+export default function ConfirmationScreen({ onBack, onComplete, reportData }: ConfirmationScreenProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -60,13 +61,13 @@ export default function ConfirmationScreen({ onBack, reportData }: ConfirmationS
       }),
     ]).start();
 
-    // Auto navigate back after 5 seconds
+    // Auto navigate back after 2 seconds
     const timer = setTimeout(() => {
-      onBack();
-    }, 5000);
+      onComplete();
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, [onBack]);
+  }, [onComplete]);
 
   const handleBackToMap = () => {
     onBack();

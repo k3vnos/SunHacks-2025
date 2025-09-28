@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { analyzeHazardDirect } from '../gemini';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   Platform,
   StatusBar,
   Dimensions,
+  Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +21,7 @@ const { width } = Dimensions.get('window');
 
 interface ReportScreenProps {
   onBack: () => void;
-  onSubmit: (data: ReportData) => void;
+  onSubmit: (data: ReportData, onNavigationComplete?: () => void) => void;
 }
 
 interface ReportData {
@@ -41,30 +42,29 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  
+  // Animation for loading spinner
+  const spinValue = useRef(new Animated.Value(0)).current;
 
-  // Generate AI title based on description
-  const generateTitle = async (description: string) => {
-    if (!description.trim()) return;
-    
-    setIsGeneratingTitle(true);
-    try {
-      // TODO: Integrate with Gemini AI API
-      // For now, we'll simulate AI title generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate AI-generated title based on description
-      const aiTitle = `Hazard Report: ${description.split(' ').slice(0, 3).join(' ')}`;
-      setTitle(aiTitle);
-    } catch (error) {
-      console.error('Error generating title:', error);
-      Alert.alert('Error', 'Failed to generate title. Please try again.');
-    } finally {
-      setIsGeneratingTitle(false);
+  // Start/stop spinner animation based on isSubmitting state
+  useEffect(() => {
+    if (isSubmitting) {
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+      spinAnimation.start();
+      return () => spinAnimation.stop();
+    } else {
+      spinValue.setValue(0);
     }
-  };
+  }, [isSubmitting, spinValue]);
+
 
   // Take photo with camera
   const takePhoto = async () => {
@@ -189,12 +189,17 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         images: photos.map(p => p.uri),
       };
 
-      onSubmit(reportData);
+      console.log('ReportScreen: Calling onSubmit with reportData:', reportData);
+      onSubmit(reportData, () => {
+        // This callback will be called when navigation is complete
+        setIsSubmitting(false);
+        console.log('ReportScreen: Navigation complete, stopping loading animation');
+      });
+      console.log('ReportScreen: onSubmit call completed');
     } catch (error: any) {
       console.error('Error submitting report:', error);
       Alert.alert('Error', error?.message ? String(error.message) : 'Failed to submit report. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only stop loading on error
     }
   };
 
@@ -231,22 +236,6 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
             placeholder="Enter title for your report"
             placeholderTextColor="#999999"
           />
-          {description.trim() && (
-            <TouchableOpacity
-              style={styles.aiButton}
-              onPress={() => generateTitle(description)}
-              disabled={isGeneratingTitle}
-            >
-              <Ionicons 
-                name="sparkles" 
-                size={16} 
-                color={isGeneratingTitle ? "#999999" : "#E74C3C"} 
-              />
-              <Text style={[styles.aiButtonText, isGeneratingTitle && styles.aiButtonTextDisabled]}>
-                {isGeneratingTitle ? 'Generating...' : 'Generate with AI'}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Description Section */}
@@ -329,7 +318,20 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         >
           {isSubmitting ? (
             <View style={styles.loadingContainer}>
-              <Ionicons name="hourglass" size={20} color="#FFFFFF" />
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: spinValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Ionicons name="refresh" size={20} color="#FFFFFF" />
+              </Animated.View>
               <Text style={styles.submitButtonText}>Submitting...</Text>
             </View>
           ) : (
@@ -337,6 +339,30 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Loading Overlay */}
+      {isSubmitting && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingModal}>
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: spinValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons name="refresh" size={40} color="#E74C3C" />
+            </Animated.View>
+            <Text style={styles.loadingText}>Submitting Report...</Text>
+            <Text style={styles.loadingSubtext}>Please wait while we process your submission</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -415,25 +441,6 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     minHeight: 100,
   },
-  aiButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  aiButtonText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#E74C3C',
-    fontWeight: '500',
-  },
-  aiButtonTextDisabled: {
-    color: '#999999',
-  },
   photoActions: {
     flexDirection: 'row',
     marginBottom: 16,
@@ -510,6 +517,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   inputError: {
     borderColor: '#E74C3C',
@@ -520,5 +528,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    minWidth: 200,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
