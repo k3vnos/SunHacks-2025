@@ -160,17 +160,20 @@ export default function ReportScreen({ onBack, onSubmit }: ReportScreenProps) {
         return;
       }
 
+      // Convert MIME type to Gemini-supported format
+      const supportedMimeType = primary.mimeType === 'image/avif' ? 'image/jpeg' : (primary.mimeType || 'image/jpeg');
+
       // Prefer data URL if base64 is present; fallback to URI (gemini.js can still read URI)
       const imageForGemini = primary.base64
-        ? `data:${primary.mimeType || 'image/jpeg'};base64,${primary.base64}`
+        ? `data:${supportedMimeType};base64,${primary.base64}`
         : primary.uri;
 
       // Ask Gemini (frontend direct)
       const ai = await analyzeHazardDirect({
         title: title.trim() || null,
         description: description.trim(),
-        image: imageForGemini,                         // 👈 pass data URL when available
-        imageMime: primary.mimeType || 'image/jpeg',
+        image: imageForGemini,
+        imageMime: supportedMimeType,
       });
 
       if (!ai?.valid_hazard) {
