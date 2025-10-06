@@ -1,16 +1,16 @@
-# FlagIt — Expo (React Native) + Gemini + Firebase/Google Cloud
+# FlagIt — Expo (React Native) + Gemini + AWS
 
-FlagIt is a mobile app that makes **reporting public hazards** fast, accurate, and community-driven. Users attach a photo, add a short description, and **Google Gemini** helps verify whether it’s a real public hazard, improves the wording, and suggests a category. 
-The app uses **Firebase**/**Google Cloud** for storage and backend: Firestore (reports, votes, comments), Cloud Storage (images), and (optionally) Cloud Functions (secure AI calls & workflows).
+FlagIt is a mobile app that makes **reporting public hazards** fast, accurate, and community-driven. Users attach a photo, add a short description, and **Google Gemini** helps verify whether it's a real public hazard, improves the wording, and suggests a category.
+The app uses **AWS** for storage and backend: DynamoDB (reports, votes, comments) and S3 (images). The goal of the app is to help people share hazards in their surroundings and notify peopel and municipalities quickly. 
 
 ---
 
 ## Tech Stack
 
-- **Expo (React Native)** — cross-platform mobile app  
-- **Google Gemini API** — vision + text classification and summarization  
-- **Firebase** — Firestore (data), Cloud Storage (images), Cloud Functions (backend)  
-- **Google Cloud** — project/billing + Generative Language API 
+- **Expo (React Native)** — cross-platform mobile app
+- **Google Gemini API** — vision + text classification and summarization
+- **AWS DynamoDB** — NoSQL database for storing hazard reports and user interactions
+- **AWS S3** — object storage for hazard images 
 
 ---
 
@@ -34,19 +34,24 @@ yarn install
 ```
 
 ### 2) Environment
-Create a .env in the project root:
-```bash
-# Gemini
-GEMINI_API_KEY=your_gemini_key_here
+Create a `.env` file in the project root with the following configuration:
 
-# Firebase (example keys — replace with your values)
-FIREBASE_API_KEY=your_firebase_api_key
-FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=000000000000
-FIREBASE_APP_ID=1:000000000000:web:xxxxxxxxxxxxxxxxxxxx
+```bash
+# Gemini API
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# AWS DynamoDB Configuration
+AWS_REGION=us-east-1 # Location based on your account
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+DYNAMODB_TABLE_NAME=Hazard_flags
+S3_BUCKET_NAME=your_s3_bucket_name
 ```
+
+**Important:** Replace the placeholder values with your actual credentials:
+- Get your Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+- Get your AWS credentials from the [AWS IAM Console](https://console.aws.amazon.com/iam/)
+- Ensure your AWS IAM user has permissions for DynamoDB and S3
 
 ### 3) Run the app
 ```bash
