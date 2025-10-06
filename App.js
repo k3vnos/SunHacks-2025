@@ -5,6 +5,8 @@ import ReportScreen from "./src/components/ReportScreen";
 import ConfirmationScreen from "./src/components/ConfirmationScreen";
 import SuccessPopup from "./src/components/SuccessPopup";
 import * as Location from 'expo-location';
+import { saveReport, getAllReports } from './src/dynamodb';
+import { uploadImagesToS3 } from './src/s3Upload';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +51,16 @@ export default function App() {
     } catch (error) {
       console.error('Error getting location:', error);
     }
+
+    // Load existing reports from DynamoDB
+    try {
+      const reports = await getAllReports();
+      setHazards(reports);
+      console.log('Loaded', reports.length, 'reports from DynamoDB');
+    } catch (error) {
+      console.error('Error loading reports from DynamoDB:', error);
+    }
+
     setIsLoading(false);
   };
 
@@ -79,26 +91,49 @@ export default function App() {
       };
       
       console.log('Fresh location for report:', currentLocation);
-      
-      // Create the submitted report with fresh location
+
+      const reportId = Date.now().toString();
+
+      // Upload images to S3
+      let s3ImageUrls = [];
+      try {
+        console.log('Uploading images to S3...');
+        s3ImageUrls = await uploadImagesToS3(reportData.images, reportId);
+        console.log('Images uploaded to S3:', s3ImageUrls);
+      } catch (s3Error) {
+        console.error('Failed to upload images to S3:', s3Error);
+        // Fall back to local URIs if S3 upload fails
+        s3ImageUrls = reportData.images;
+      }
+
+      // Create the submitted report with fresh location and S3 URLs
       const newReport = {
-        id: Date.now().toString(),
+        id: reportId,
         title: reportData.title,
         description: reportData.description,
-        images: reportData.images,
+        images: s3ImageUrls,
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
         timestamp: new Date().toISOString(),
+        category: reportData.category,
       };
-      
+
       console.log('New report created:', newReport);
-      
+
+      // Save to DynamoDB
+      try {
+        await saveReport(newReport);
+        console.log('Report saved to DynamoDB successfully');
+      } catch (dbError) {
+        console.error('Failed to save to DynamoDB, continuing anyway:', dbError);
+      }
+
       // Add to hazards list for map display
       setHazards(prev => [...prev, newReport]);
-      
+
       // Set the submitted report and navigate to confirmation
       console.log('Setting submitted report and navigating to confirmation');
-      
+
       // Use a single state update to avoid race conditions
       setSubmittedReport(newReport);
       setTimeout(() => {
@@ -111,20 +146,43 @@ export default function App() {
       }, 0);
     } catch (error) {
       console.error('Error getting fresh location:', error);
+
+      const reportId = Date.now().toString();
+
+      // Upload images to S3
+      let s3ImageUrls = [];
+      try {
+        console.log('Uploading images to S3 (fallback)...');
+        s3ImageUrls = await uploadImagesToS3(reportData.images, reportId);
+        console.log('Images uploaded to S3 (fallback):', s3ImageUrls);
+      } catch (s3Error) {
+        console.error('Failed to upload images to S3:', s3Error);
+        s3ImageUrls = reportData.images;
+      }
+
       // Fallback to stored location if fresh location fails
       const newReport = {
-        id: Date.now().toString(),
+        id: reportId,
         title: reportData.title,
         description: reportData.description,
-        images: reportData.images,
+        images: s3ImageUrls,
         latitude: userLocation?.latitude || 37.7749,
         longitude: userLocation?.longitude || -122.4194,
         timestamp: new Date().toISOString(),
+        category: reportData.category,
       };
-      
+
+      // Save to DynamoDB
+      try {
+        await saveReport(newReport);
+        console.log('Report saved to DynamoDB successfully (fallback)');
+      } catch (dbError) {
+        console.error('Failed to save to DynamoDB, continuing anyway:', dbError);
+      }
+
       setHazards(prev => [...prev, newReport]);
       console.log('Setting submitted report (fallback) and navigating to confirmation');
-      
+
       // Use a single state update to avoid race conditions
       setSubmittedReport(newReport);
       setTimeout(() => {
