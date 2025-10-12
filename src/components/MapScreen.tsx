@@ -17,6 +17,7 @@ import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,9 +47,10 @@ interface Comment {
 interface MapScreenProps {
   onFlagPress: () => void;
   hazards: Hazard[];
+  onLogout: () => void;
 }
 
-export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
+export default function MapScreen({ onFlagPress, hazards, onLogout }: MapScreenProps) {
   const mapRef = useRef(null);
   const [region, setRegion] = useState(null);
   const [hasLocation, setHasLocation] = useState(false);
@@ -60,6 +62,8 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
   const [liveVoteCounts, setLiveVoteCounts] = useState<{[key: string]: {upvotes: number, downvotes: number}}>({});
   const [commentVoteCounts, setCommentVoteCounts] = useState<{[key: string]: {upvotes: number, downvotes: number}}>({});
   const [hazardCategories, setHazardCategories] = useState<{[key: string]: string}>({});
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const { user } = useAuth();
 
   // Initialize vote counts when hazards change
   useEffect(() => {
@@ -293,10 +297,26 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
     console.log(`Voted ${voteType} for comment ${commentId}`, newCounts);
   };
 
+  const handleAccountPress = () => {
+    setShowAccountMenu(!showAccountMenu);
+  };
+
+  const handleLogout = () => {
+    setShowAccountMenu(false);
+    onLogout();
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      
+      {/* Overlay to close menu when tapping outside */}
+      {showAccountMenu && (
+        <Pressable 
+          style={styles.overlay} 
+          onPress={() => setShowAccountMenu(false)}
+        />
+      )}
       
       {/* Header with FlagIt Logo */}
       <View style={styles.header}>
@@ -305,6 +325,19 @@ export default function MapScreen({ onFlagPress, hazards }: MapScreenProps) {
           style={styles.logo}
           resizeMode="contain"
         />
+        <Pressable style={styles.accountButton} onPress={handleAccountPress}>
+          <Ionicons name="person-circle-outline" size={28} color="#2C3E50" />
+        </Pressable>
+        
+        {/* Account Dropdown Menu */}
+        {showAccountMenu && (
+          <View style={styles.accountMenu}>
+            <Pressable style={styles.menuItem} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="#E74C3C" />
+              <Text style={styles.menuItemText}>Logout</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {/* Loading Indicator */}
@@ -527,6 +560,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+  },
   header: {
     position: 'absolute',
     top: 0,
@@ -537,7 +578,9 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     paddingHorizontal: 20,
     backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -547,6 +590,44 @@ const styles = StyleSheet.create({
   logo: {
     height: 40,
     width: 120,
+  },
+  accountButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  accountMenu: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    minWidth: 120,
+    zIndex: 1000,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#E74C3C',
+    marginLeft: 12,
   },
   loadingContainer: {
     flex: 1,

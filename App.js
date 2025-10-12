@@ -1,24 +1,40 @@
 import React, { useState, useEffect } from "react";
 import LoadingScreen from "./src/components/LoadingScreen";
+import LoginScreen from "./src/components/LoginScreen";
+import SignupScreen from "./src/components/SignupScreen";
 import MapScreen from "./src/components/MapScreen";
 import ReportScreen from "./src/components/ReportScreen";
 import ConfirmationScreen from "./src/components/ConfirmationScreen";
 import SuccessPopup from "./src/components/SuccessPopup";
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import * as Location from 'expo-location';
 import { saveReport, getAllReports } from './src/dynamodb';
 import { uploadImagesToS3 } from './src/s3Upload';
 
-export default function App() {
+function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [currentScreen, setCurrentScreen] = useState('map'); // 'map', 'report', or 'confirmation'
+  const [currentScreen, setCurrentScreen] = useState('login'); // 'login', 'signup', 'map', 'report', or 'confirmation'
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [hazards, setHazards] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [submittedReport, setSubmittedReport] = useState(null);
   const [locationSubscription, setLocationSubscription] = useState(null);
+  const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
 
-  const handleLoadingComplete = async () => {
-    // Get user location when app loads and start tracking
+  // Handle authentication state changes
+  useEffect(() => {
+    if (!authLoading) {
+      if (isAuthenticated) {
+        setCurrentScreen('map');
+        initializeApp();
+      } else {
+        setCurrentScreen('login');
+      }
+    }
+  }, [isAuthenticated, authLoading]);
+
+  const initializeApp = async () => {
+    // Get user location when authenticated and start tracking
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -60,8 +76,20 @@ export default function App() {
     } catch (error) {
       console.error('Error loading reports from DynamoDB:', error);
     }
+  };
 
-    setIsLoading(false);
+  // Navigation handlers
+  const handleNavigateToSignup = () => {
+    setCurrentScreen('signup');
+  };
+
+  const handleNavigateToLogin = () => {
+    setCurrentScreen('login');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentScreen('login');
   };
 
 
@@ -232,10 +260,18 @@ export default function App() {
 
   // Show loading screen first
   if (isLoading) {
-    return <LoadingScreen onLoadingComplete={handleLoadingComplete} />;
+    return <LoadingScreen onLoadingComplete={() => setIsLoading(false)} />;
   }
 
-  // Show appropriate screen based on current state
+  // Show authentication screens if not authenticated
+  if (!isAuthenticated) {
+    if (currentScreen === 'signup') {
+      return <SignupScreen onNavigateToLogin={handleNavigateToLogin} />;
+    }
+    return <LoginScreen onNavigateToSignup={handleNavigateToSignup} />;
+  }
+
+  // Show appropriate screen based on current state for authenticated users
   console.log('Rendering decision - currentScreen:', currentScreen, 'submittedReport:', submittedReport ? 'exists' : 'null');
   
   if (currentScreen === 'report') {
@@ -262,11 +298,19 @@ export default function App() {
   console.log('Rendering MapScreen (default)');
   return (
     <>
-      <MapScreen onFlagPress={handleFlagPress} hazards={hazards} />
+      <MapScreen onFlagPress={handleFlagPress} hazards={hazards} onLogout={handleLogout} />
       <SuccessPopup 
         visible={showSuccessPopup}
         onClose={handleCloseSuccessPopup}
       />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
